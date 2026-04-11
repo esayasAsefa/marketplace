@@ -1,0 +1,161 @@
+"use server";
+
+import { put } from "@vercel/blob";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { stackServerApp } from "@/stack";
+import db from "@/db";
+import { users, profiles, services } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+export type FormState = {
+  success: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+const SERVICE_CATEGORIES = [
+  "electrician",
+  "plumber",
+  "tutor",
+  "developer",
+  "painter",
+  "carpenter",
+  "it-support",
+  "mover",
+  "barber",
+  "photographer",
+  "gardener",
+  "security",
+] as const;
+
+export async function createProProfile(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  // 1. Authenticate the user
+  const stackUser = await stackServerApp.getUser();
+  if (!stackUser) {
+    return { success: false, error: "You must be signed in to become a pro." };
+  }
+
+  // 2. Extract form data
+  const bio = formData.get("bio") as string | null;
+  const phone = formData.get("phone") as string | null;
+  const profileImage = formData.get("profileImage") as File | null;
+  const categoryId = formData.get("categoryId") as string | null;
+  const serviceTitle = formData.get("serviceTitle") as string | null;
+  const serviceDescription = formData.get("serviceDescription") as string | null;
+  const priceStr = formData.get("price") as string | null;
+  const address = formData.get("address") as string | null;
+
+  // 3. Validate required fields
+  const fieldErrors: Record<string, string> = {};
+
+  if (!bio || bio.trim().length < 20) {
+    fieldErrors.bio = "Bio must be at least 20 characters.";
+  }
+  if (!phone || phone.trim().length < 6) {
+    fieldErrors.phone = "Please enter a valid phone number.";
+  }
+  if (!categoryId || !SERVICE_CATEGORIES.includes(categoryId as any)) {
+    fieldErrors.categoryId = "Please select a service category.";
+  }
+  if (!serviceTitle || serviceTitle.trim().length < 5) {
+    fieldErrors.serviceTitle = "Service title must be at least 5 characters.";
+  }
+  if (!serviceDescription || serviceDescription.trim().length < 20) {
+    fieldErrors.serviceDescription =
+      "Service description must be at least 20 characters.";
+  }
+  if (!priceStr || isNaN(Number(priceStr)) || Number(priceStr) <= 0) {
+    fieldErrors.price = "Please enter a valid price greater than 0.";
+  }
+  if (!address || address.trim().length < 3) {
+    fieldErrors.address = "Please enter your service area / address.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { success: false, error: "Please fix the errors below.", fieldErrors };
+  }
+
+  try {
+    // 4. Upload profile image to Vercel Blob (if provided)
+    let profileImageUrl = stackUser.profileImageUrl;
+
+    if (profileImage && profileImage.size > 0) {
+      if (profileImage.size > 4 * 1024 * 1024) {
+        return {
+          success: false,
+          fieldErrors: {
+            profileImage: "Image must be less than 4MB.",
+          },
+        };
+      }
+
+      const blob = await put(
+        `profiles/${stackUser.id}/${profileImage.name}`,
+        profileImage,
+        { access: "public" }
+      );
+      profileImageUrl = blob.url;
+    }
+
+    // 5. Upsert user in the users table (in case sync hasn't run yet)
+    await db
+      .insert(users)
+      .values({
+        id: stackUser.id,
+        email: stackUser.primaryEmail!,
+        name: stackUser.displayName ?? null,
+        profileImageUrl: profileImageUrl ?? null,
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          name: stackUser.displayName ?? null,
+          profileImageUrl: profileImageUrl ?? null,
+        },
+      });
+
+    // 6. Upsert profile (set isPro = true, save bio & phone)
+    await db
+      .insert(profiles)
+      .values({
+        userId: stackUser.id,
+        isPro: true,
+        bio: bio!.trim(),
+        phone: phone!.trim(),
+      })
+      .onConflictDoUpdate({
+        target: profiles.userId,
+        set: {
+          isPro: true,
+          bio: bio!.trim(),
+          phone: phone!.trim(),
+        },
+      });
+
+    // 7. Insert the service listing
+    const priceInCents = Math.round(Number(priceStr) * 100);
+
+    await db.insert(services).values({
+      proId: stackUser.id,
+      categoryId: categoryId!,
+      title: serviceTitle!.trim(),
+      description: serviceDescription!.trim(),
+      price: priceInCents,
+      address: address!.trim(),
+    });
+
+    revalidatePath("/");
+  } catch (err) {
+    console.error("[become-pro] Error creating pro profile:", err);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+
+  redirect("/");
+}
