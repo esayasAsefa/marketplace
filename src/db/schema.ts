@@ -55,6 +55,9 @@ export const bookings = pgTable("bookings", {
     .references(() => users.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 50 }).default("pending").notNull(), // 'pending', 'accepted', 'completed', 'cancelled'
   scheduledDate: timestamp("scheduled_date").notNull(),
+  customerPhone: text("customer_phone"),
+  locationLat: numeric("location_lat"),
+  locationLng: numeric("location_lng"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

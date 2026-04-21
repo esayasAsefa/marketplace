@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { stackServerApp } from "@/stack";
 import db from "@/db";
 import { users, profiles, services } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { cacheInvalidate, CACHE_KEYS } from "@/cache";
+import redis from "@/cache";
 
 export type FormState = {
   success: boolean;
@@ -93,12 +94,28 @@ export async function createProProfile(
         };
       }
 
-      const blob = await put(
-        `profiles/${stackUser.id}/${profileImage.name}`,
-        profileImage,
-        { access: "public" }
-      );
-      profileImageUrl = blob.url;
+      // Image upload is optional. If it fails (e.g. missing Blob token in local dev),
+      // continue profile creation with the existing profile image URL.
+      try {
+        const blob = await put(
+          `profiles/${stackUser.id}/${profileImage.name}`,
+          profileImage,
+          {
+            access: "public",
+            allowOverwrite: true,
+          }
+        );
+        profileImageUrl = blob.url;
+
+        // Sync the new image back to StackAuth so the UserButton updates
+        try {
+          await stackUser.update({ profileImageUrl });
+        } catch (e) {
+          console.warn("Could not update Stack profile picture:", e);
+        }
+      } catch (e) {
+        console.warn("Profile image upload failed; continuing without new image:", e);
+      }
     }
 
     // 5. Upsert user in the users table (in case sync hasn't run yet)
@@ -113,6 +130,8 @@ export async function createProProfile(
       .onConflictDoUpdate({
         target: users.id,
         set: {
+          id: stackUser.id,
+          email: stackUser.primaryEmail!,
           name: stackUser.displayName ?? null,
           profileImageUrl: profileImageUrl ?? null,
         },
@@ -148,7 +167,23 @@ export async function createProProfile(
       address: address!.trim(),
     });
 
+    // 8. Invalidate Redis caches so new data appears immediately
+    await cacheInvalidate(
+      CACHE_KEYS.featuredPros,
+      CACHE_KEYS.categoryCounts,
+    );
+    // Also clear any cached services queries (pattern: services:*)
+    try {
+      const keys = await redis.keys("services:*");
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } catch (e) {
+      console.warn("[become-pro] Could not clear services cache:", e);
+    }
+
     revalidatePath("/");
+    revalidatePath("/services");
   } catch (err) {
     console.error("[become-pro] Error creating pro profile:", err);
     return {

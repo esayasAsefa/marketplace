@@ -4,6 +4,7 @@ import { Menu, X, Zap, LogOut, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUser, useStackApp } from "@stackframe/stack";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { checkUserIsPro } from "@/app/actions/user";
 import { Button } from "@/components/ui/button";
 import { UserButton } from "@stackframe/stack";
 import {
@@ -21,8 +22,17 @@ const navLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const user = useUser();
   const app = useStackApp();
+
+  useEffect(() => {
+    if (user) {
+      checkUserIsPro().then(setIsPro);
+    } else {
+      setIsPro(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -70,13 +80,24 @@ export function Navbar() {
             <ThemeToggle />
             {user ? (
               <>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="font-medium border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400 dark:hover:bg-brand-950/50"
-                >
-                  <Link href="/become-pro">Become a Pro</Link>
-                </Button>
+                {!isPro && (
+                  <Button
+                    asChild
+                    variant="ghost"
+                    className="font-medium hover:bg-primary/5"
+                  >
+                    <Link href="/dashboard/customer">My Bookings</Link>
+                  </Button>
+                )}
+                {isPro && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="font-medium border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400 dark:hover:bg-brand-950/50"
+                  >
+                    <Link href="/dashboard/pro">Pro Dashboard</Link>
+                  </Button>
+                )}
                 <UserButton />
               </>
             ) : (
@@ -146,20 +167,38 @@ export function Navbar() {
                       {user.displayName || user.primaryEmail || "User"}
                     </span>
                   </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center border-brand-200 text-brand-600 dark:border-brand-800 dark:text-brand-400"
-                    id="mobile-become-pro-btn"
-                  >
-                    <Link
-                      href="/become-pro"
-                      onClick={() => setMobileOpen(false)}
+                  {!isPro && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center"
+                      id="mobile-my-bookings-btn"
                     >
-                      Become a Pro
-                    </Link>
-                  </Button>
+                      <Link
+                        href="/dashboard/customer"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        My Bookings
+                      </Link>
+                    </Button>
+                  )}
+                  {isPro && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center border-brand-200 text-brand-600 dark:border-brand-800 dark:text-brand-400"
+                      id="mobile-pro-dashboard-btn"
+                    >
+                      <Link
+                        href="/dashboard/pro"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        Pro Dashboard
+                      </Link>
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

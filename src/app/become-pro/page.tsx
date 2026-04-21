@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState, useRef } from "react";
+import { useActionState, useState, useRef, useEffect } from "react";
 import { useUser } from "@stackframe/stack";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Camera,
@@ -76,6 +77,23 @@ export default function BecomeProPage() {
     createProProfile,
     { success: false }
   );
+  const validationMessages = state.fieldErrors
+    ? Object.values(state.fieldErrors)
+    : [];
+
+  useEffect(() => {
+    if (state.fieldErrors) {
+      if (
+        state.fieldErrors.profileImage ||
+        state.fieldErrors.phone ||
+        state.fieldErrors.bio
+      ) {
+        setStep(0);
+      } else {
+        setStep(1);
+      }
+    }
+  }, [state.fieldErrors]);
 
   // Redirect to sign in if not authenticated
   if (!user) {
@@ -87,6 +105,7 @@ export default function BecomeProPage() {
     if (file) {
       if (file.size > 4 * 1024 * 1024) {
         alert("Image must be less than 4MB");
+        e.target.value = "";
         return;
       }
       const reader = new FileReader();
@@ -176,9 +195,18 @@ export default function BecomeProPage() {
         </div>
 
         {/* Error Banner */}
-        {state.error && (
+        {(state.error || validationMessages.length > 0) && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400 animate-fade-up">
-            {state.error}
+            <p className="font-medium">
+              {state.error || "Please fix the errors below."}
+            </p>
+            {validationMessages.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {validationMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -208,14 +236,18 @@ export default function BecomeProPage() {
               <div className="space-y-6 p-6">
                 {/* Profile Image Upload */}
                 <div className="flex flex-col items-center gap-4">
-                  <div
+                  <button
+                    type="button"
                     className="group relative h-28 w-28 cursor-pointer overflow-hidden rounded-full border-4 border-brand-100 shadow-lg transition-all hover:border-brand-300 dark:border-brand-900 dark:hover:border-brand-700"
                     onClick={() => fileInputRef.current?.click()}
+                    aria-label="Upload profile photo"
                   >
                     {imagePreview || user.profileImageUrl ? (
-                      <img
+                      <Image
                         src={imagePreview || user.profileImageUrl || ""}
                         alt="Profile"
+                        width={112}
+                        height={112}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
                       />
                     ) : (
@@ -226,7 +258,7 @@ export default function BecomeProPage() {
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                       <Camera className="h-6 w-6 text-white" />
                     </div>
-                  </div>
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"

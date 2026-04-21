@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@/db/schema";
 import "dotenv/config";
@@ -13,10 +13,30 @@ const getDatabaseUrl = () => {
   return url;
 };
 
-const sql = neon(getDatabaseUrl());
+// Wrap fetch with retry logic to handle transient connection failures
+const fetchWithRetry: typeof fetch = async (input, init) => {
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fetch(input, { ...init, cache: "no-store" as any });
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+      // Brief backoff before retrying
+      await new Promise((r) => setTimeout(r, 200 * attempt));
+    }
+  }
+  // Unreachable, but TypeScript needs it
+  throw new Error("fetchWithRetry: exhausted retries");
+};
+
+// Set the custom fetch function globally for the Neon driver
+neonConfig.fetchFunction = fetchWithRetry;
+
+const sql = neon(getDatabaseUrl(), { fetchOptions: { cache: "no-store" } });
 const db = drizzle(sql, { schema });
 
 // Export the raw sql client in case callers need to run raw queries (e.g. adjust sequences after seeding)
 export { sql };
 
 export default db;
+
