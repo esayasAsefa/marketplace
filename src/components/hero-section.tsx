@@ -1,7 +1,8 @@
 "use client";
 
-import { Clock, MapPin, Search, Shield, Star, Users } from "lucide-react";
+import { Clock, MapPin, Search, Shield, Star, Users, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,42 @@ const trustBadges = [
 ];
 
 export function HeroSection() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async () => {
+    if (!query) return;
+    setIsSearching(true);
+    
+    try {
+      const res = await fetch("/api/ai/parse-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const parsed = await res.json();
+      
+      const params = new URLSearchParams();
+      if (parsed.category) {
+        params.set("category", parsed.category);
+      }
+      if (parsed.keywords && parsed.keywords.length > 0) {
+        params.set("q", parsed.keywords.join(" "));
+      } else {
+        params.set("q", query);
+      }
+      
+      router.push(`/services?${params.toString()}`);
+    } catch (error) {
+      console.error("AI Search Parse Error, falling back to basic search:", error);
+      // Fallback search
+      router.push(`/services?q=${encodeURIComponent(query)}`);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <section
@@ -78,6 +113,7 @@ export function HeroSection() {
                     placeholder="What service do you need?"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     className="h-12 rounded-xl border-0 bg-background/50 pl-11 text-base shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-brand-500/30"
                   />
                 </div>
@@ -95,10 +131,21 @@ export function HeroSection() {
                 <Button
                   id="search-button"
                   size="lg"
-                  className="h-12 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 px-8 text-white shadow-lg shadow-brand-500/25 transition-all hover:shadow-xl hover:shadow-brand-500/30 hover:brightness-110"
+                  onClick={handleSearch}
+                  disabled={isSearching}
+                  className="h-12 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 px-8 text-white shadow-lg shadow-brand-500/25 transition-all hover:shadow-xl hover:shadow-brand-500/30 hover:brightness-110 disabled:opacity-75"
                 >
-                  <Search className="mr-2 h-4 w-4" />
-                  Search
+                  {isSearching ? (
+                    <span className="flex items-center">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Wait...
+                    </span>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Search
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

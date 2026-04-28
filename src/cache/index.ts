@@ -26,6 +26,10 @@ export const CACHE_KEYS = {
   customerBookings: (userId: string) => `customer-bookings:${userId}`,
   /** Pro dashboard services: `pro-services:<userId>` */
   proServices: (userId: string) => `pro-services:${userId}`,
+  /** OTP verification code: `otp:<userId>:<email>` */
+  otpCode: (userId: string, email: string) => `otp:${userId}:${email}`,
+  /** Welcome email sent flag: `welcome-sent:<userId>` */
+  welcomeSent: (userId: string) => `welcome-sent:${userId}`,
 } as const;
 
 // ── TTLs (in seconds) ──────────────────────────────────────

@@ -1,4 +1,4 @@
-import { Zap } from "lucide-react";
+import { Phone, Zap } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const footerLinks = {
@@ -32,6 +32,13 @@ const footerLinks = {
 };
 
 export function Footer() {
+  const socialLinks = [
+    { name: "X", url: "https://x.com/esayas_93" },
+    { name: "FB", url: "https://www.facebook.com/isu.chsu" },
+    { name: "IG", url: "https://www.instagram.com/esayas_93?igsh=NmFtbnN0bzVuYjdw" },
+    { name: "LI", url: "https://www.linkedin.com/in/esayas-asefa-3295a4368/" },
+  ];
+
   return (
     <footer className="border-t border-border/50 bg-muted/30">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -54,16 +61,25 @@ export function Footer() {
             </p>
             {/* Social Links */}
             <div className="mt-6 flex gap-3">
-              {["X", "FB", "IG", "LI"].map((social) => (
+              {socialLinks.map((social) => (
                 <a
-                  key={social}
-                  href="https://example.com"
+                  key={social.name}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-xs font-bold text-muted-foreground ring-1 ring-border/50 transition-all hover:bg-brand-50 hover:text-brand-600 hover:ring-brand-200 dark:hover:bg-brand-950/30 dark:hover:text-brand-400"
                 >
-                  {social}
+                  {social.name}
                 </a>
               ))}
             </div>
+            <a
+              href="tel:+251993435600"
+              className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Phone className="h-4 w-4" />
+              +251 993 435 600
+            </a>
           </div>
 
           {/* Links */}

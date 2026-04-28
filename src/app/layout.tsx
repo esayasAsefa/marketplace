@@ -5,7 +5,8 @@ import { StackProvider } from "@stackframe/stack";
 import { stackServerApp } from "../stack";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
-import { Navbar } from "@/components/navbar";
+import { AiChatbot } from "@/components/ai-chatbot";
+import { syncCurrentUser } from "@/lib/sync-user";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -35,17 +36,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Sync user to DB — fire-and-forget, never crash the layout
+  try {
+    await syncCurrentUser();
+  } catch {
+    // StackAuth or DB unreachable — continue rendering the page
+  }
+
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
+    <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
         <StackProvider app={stackServerApp}>
           <TooltipProvider>
             <Suspense>{children}</Suspense>
+            <AiChatbot />
           </TooltipProvider>
         </StackProvider>
       </body>

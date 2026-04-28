@@ -18,7 +18,11 @@ const fetchWithRetry: typeof fetch = async (input, init) => {
   const MAX_RETRIES = 3;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await fetch(input, { ...init, cache: "no-store" as any });
+      const res = await fetch(input, init);
+      if (!res.ok) {
+        console.error(`[fetchWithRetry attempt ${attempt}] Neon responded with status ${res.status}:`, await res.clone().text());
+      }
+      return res;
     } catch (err) {
       if (attempt === MAX_RETRIES) throw err;
       // Brief backoff before retrying
@@ -32,7 +36,7 @@ const fetchWithRetry: typeof fetch = async (input, init) => {
 // Set the custom fetch function globally for the Neon driver
 neonConfig.fetchFunction = fetchWithRetry;
 
-const sql = neon(getDatabaseUrl(), { fetchOptions: { cache: "no-store" } });
+const sql = neon(getDatabaseUrl());
 const db = drizzle(sql, { schema });
 
 // Export the raw sql client in case callers need to run raw queries (e.g. adjust sequences after seeding)

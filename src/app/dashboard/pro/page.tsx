@@ -7,6 +7,7 @@ import db from "@/db";
 import { bookings, services, users, profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cacheGet, cacheSet, CACHE_KEYS, TTL } from "@/cache";
+import { syncCurrentUser } from "@/lib/sync-user";
 
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -38,10 +39,17 @@ type ProService = {
 };
 
 export default async function ProDashboardPage() {
-  const stackUser = await stackServerApp.getUser();
+  let stackUser;
+  try {
+    stackUser = await stackServerApp.getUser();
+  } catch {
+    redirect("/handler/sign-in");
+  }
   if (!stackUser) {
     redirect("/handler/sign-in");
   }
+
+  try { await syncCurrentUser(); } catch {}
 
   // Check if user is actually a Pro
   let isPro = false;

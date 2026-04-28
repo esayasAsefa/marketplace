@@ -10,7 +10,13 @@ import { eq } from "drizzle-orm";
  * Returns `true` if the user exists in the profiles table with isPro = true.
  */
 export async function checkUserIsPro(): Promise<boolean> {
-  const stackUser = await stackServerApp.getUser();
+  let stackUser;
+  try {
+    stackUser = await stackServerApp.getUser();
+  } catch {
+    // StackAuth API may be down — fail gracefully
+    return false;
+  }
   if (!stackUser) return false;
 
   try {

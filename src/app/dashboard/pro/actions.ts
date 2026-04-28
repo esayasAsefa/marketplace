@@ -2,10 +2,14 @@
 
 import { stackServerApp } from "@/stack";
 import db from "@/db";
-import { bookings, services, profiles } from "@/db/schema";
+import { bookings, services, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cacheInvalidate, CACHE_KEYS } from "@/cache";
+// Note: We don't import resend/generateBookingAcceptedEmailHtml here anymore. 
+// We will use nodemailer directly or abstract it. 
+import transporter, { gmailFromAddress } from "@/email";
+import { generateBookingAcceptedEmailHtml } from "@/email/celebration-email";
 
 export type ActionResult = {
   success: boolean;
@@ -32,6 +36,8 @@ export async function updateBookingStatus(
         id: bookings.id,
         customerId: bookings.customerId,
         serviceProId: services.proId,
+        serviceTitle: services.title,
+        scheduledDate: bookings.scheduledDate,
       })
       .from(bookings)
       .innerJoin(services, eq(bookings.serviceId, services.id))
@@ -50,6 +56,39 @@ export async function updateBookingStatus(
       .update(bookings)
       .set({ status: newStatus })
       .where(eq(bookings.id, bookingId));
+
+    if (newStatus === "accepted") {
+      try {
+        if (!gmailFromAddress) {
+          throw new Error("GMAIL_USER is missing. Set the Gmail sender address in .env.");
+        }
+
+        const customerRecords = await db
+          .select({ name: users.name, email: users.email })
+          .from(users)
+          .where(eq(users.id, booking[0].customerId))
+          .limit(1);
+
+        if (customerRecords.length > 0 && customerRecords[0].email) {
+           const customerDbProfile = customerRecords[0];
+           const html = await generateBookingAcceptedEmailHtml(
+             customerDbProfile.name || "Valued Customer",
+             stackUser.displayName || "Your Professional",
+             booking[0].serviceTitle,
+             booking[0].scheduledDate.toISOString()
+           );
+           
+           await transporter.sendMail({
+             from: `ProNear <${gmailFromAddress}>`,
+             to: customerDbProfile.email,
+             subject: `Booking Confirmed: ${booking[0].serviceTitle}`,
+             html,
+           });
+        }
+      } catch (e) {
+        console.warn("Failed to send AI celebration email", e);
+      }
+    }
 
     // Invalidate caches for both sides
     await cacheInvalidate(

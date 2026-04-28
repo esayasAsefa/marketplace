@@ -19,8 +19,9 @@ import {
   CheckCircle2,
   Zap,
   Shield,
-  TrendingUp,
   Upload,
+  Wand2,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,89 @@ export default function BecomeProPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [bio, setBio] = useState("");
+  const [serviceTitle, setServiceTitle] = useState("");
+  const [serviceDescription, setServiceDescription] = useState("");
+  const [priceRecommendation, setPriceRecommendation] = useState<string | null>(null);
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [isGeneratingPrice, setIsGeneratingPrice] = useState(false);
+
+  const [imageFeedback, setImageFeedback] = useState<{ isHighQuality: boolean, feedback: string } | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+
+  const handleGenerateText = async (type: "bio" | "service") => {
+    if (!selectedCategory) {
+      alert("Please select a category in Step 2 first.");
+      setStep(1);
+      return;
+    }
+    if (!serviceTitle) {
+      alert("Please enter a Service Title first.");
+      setStep(1);
+      return;
+    }
+
+    if (type === "bio") setIsGeneratingBio(true);
+    else setIsGeneratingDesc(true);
+
+    try {
+      if (type === "bio") setBio("");
+      else setServiceDescription("");
+
+      const res = await fetch("/api/ai/generate-description", {
+        method: "POST",
+        body: JSON.stringify({ category: selectedCategory, title: serviceTitle, type }),
+      });
+
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value);
+        if (type === "bio") {
+          setBio((prev) => prev + chunkValue);
+        } else {
+          setServiceDescription((prev) => prev + chunkValue);
+        }
+      }
+    } catch (error) {
+      console.error("[generate-text]", error);
+      alert("Failed to generate text. Please try again.");
+    } finally {
+      if (type === "bio") setIsGeneratingBio(false);
+      else setIsGeneratingDesc(false);
+    }
+  };
+
+  const handleGetPriceRecommendation = async () => {
+    if (!selectedCategory) {
+      alert("Please select a category first.");
+      setStep(1);
+      return;
+    }
+    setIsGeneratingPrice(true);
+    try {
+      const res = await fetch("/api/ai/price-recommendation", {
+        method: "POST",
+        body: JSON.stringify({ categoryId: selectedCategory, title: serviceTitle }),
+      });
+      const data = await res.json();
+      if (data.recommendation) {
+        setPriceRecommendation(data.recommendation);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGeneratingPrice(false);
+    }
+  };
+
   const [state, formAction, isPending] = useActionState<FormState, FormData>(
     createProProfile,
     { success: false }
@@ -80,6 +164,25 @@ export default function BecomeProPage() {
   const validationMessages = state.fieldErrors
     ? Object.values(state.fieldErrors)
     : [];
+
+  const handleImageAnalysis = async (base64: string) => {
+    setIsAnalyzingImage(true);
+    setImageFeedback(null);
+    try {
+      const res = await fetch("/api/ai/analyze-image", {
+        method: "POST",
+        body: JSON.stringify({ imageBase64: base64 }),
+      });
+      const data = await res.json();
+      if (data.feedback) {
+        setImageFeedback(data);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAnalyzingImage(false);
+    }
+  };
 
   useEffect(() => {
     if (state.fieldErrors) {
@@ -109,7 +212,11 @@ export default function BecomeProPage() {
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setImagePreview(base64);
+        handleImageAnalysis(base64);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -275,6 +382,19 @@ export default function BecomeProPage() {
                     <Upload className="h-3.5 w-3.5" />
                     Upload Photo
                   </button>
+                  {isAnalyzingImage && (
+                    <p className="text-xs text-muted-foreground animate-pulse">✨ AI is analyzing image...</p>
+                  )}
+                  {imageFeedback && !isAnalyzingImage && (
+                    <div className={`mt-2 p-3 rounded-lg text-xs leading-relaxed text-left border ${
+                      imageFeedback.isHighQuality 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30' 
+                        : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30'
+                    }`}>
+                      <span className="font-semibold block mb-1">AI Snapshot Tip:</span>
+                      {imageFeedback.feedback}
+                    </div>
+                  )}
                   {state.fieldErrors?.profileImage && (
                     <p className="text-sm text-red-500">
                       {state.fieldErrors.profileImage}
@@ -322,14 +442,31 @@ export default function BecomeProPage() {
 
                 {/* Bio */}
                 <div className="space-y-2">
-                  <Label htmlFor="bio" className="flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                    About You *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="bio" className="flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                      About You *
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateText("bio")}
+                      disabled={isGeneratingBio}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                    >
+                      {isGeneratingBio ? (
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      ✨ Generate with AI
+                    </button>
+                  </div>
                   <Textarea
                     id="bio"
                     name="bio"
                     rows={4}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
                     placeholder="Tell customers about your experience, skills, and what makes you stand out..."
                     required
                     className="resize-none"
@@ -415,6 +552,8 @@ export default function BecomeProPage() {
                   <Input
                     id="serviceTitle"
                     name="serviceTitle"
+                    value={serviceTitle}
+                    onChange={(e) => setServiceTitle(e.target.value)}
                     placeholder="e.g. Expert Home Wiring & Electrical Repairs"
                     required
                   />
@@ -427,17 +566,34 @@ export default function BecomeProPage() {
 
                 {/* Service Description */}
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="serviceDescription"
-                    className="flex items-center gap-2"
-                  >
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                    Service Description *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="serviceDescription"
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                      Service Description *
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateText("service")}
+                      disabled={isGeneratingDesc}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                    >
+                      {isGeneratingDesc ? (
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      ✨ Generate with AI
+                    </button>
+                  </div>
                   <Textarea
                     id="serviceDescription"
                     name="serviceDescription"
                     rows={4}
+                    value={serviceDescription}
+                    onChange={(e) => setServiceDescription(e.target.value)}
                     placeholder="Describe what your service includes, your experience, tools you use, turnaround time, etc."
                     required
                     className="resize-none"
@@ -451,10 +607,25 @@ export default function BecomeProPage() {
 
                 {/* Price */}
                 <div className="space-y-2">
-                  <Label htmlFor="price" className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                    Starting Price (ETB) *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="price" className="flex items-center gap-2">
+                      <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                      Starting Price (ETB) *
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={handleGetPriceRecommendation}
+                      disabled={isGeneratingPrice}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                    >
+                      {isGeneratingPrice ? (
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      Get AI Pricing Tip
+                    </button>
+                  </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
                       ETB
@@ -474,6 +645,14 @@ export default function BecomeProPage() {
                     <p className="text-sm text-red-500">
                       {state.fieldErrors.price}
                     </p>
+                  )}
+                  {priceRecommendation && (
+                    <div className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 border border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900 animate-fade-up">
+                      <div className="flex items-start gap-2">
+                        <Sparkles className="h-4 w-4 mt-0.5 shrink-0" />
+                        <p>{priceRecommendation}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 

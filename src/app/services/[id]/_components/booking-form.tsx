@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Zap, CalendarDays, CheckCircle2, AlertCircle, MapPin, Loader2 } from "lucide-react";
+import { Zap, CalendarDays, CheckCircle2, AlertCircle, MapPin, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,44 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(defaultLocation || null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  
+  const [scheduleSuggestion, setScheduleSuggestion] = useState<{ time: string, reason: string } | null>(null);
+  
+  const [notes, setNotes] = useState("");
+  const [isSuggestingNotes, setIsSuggestingNotes] = useState(false);
+
+  const handleSuggestNotes = async () => {
+    setIsSuggestingNotes(true);
+    try {
+      const res = await fetch("/api/ai/suggest-notes", {
+        method: "POST",
+        body: JSON.stringify({ serviceId }),
+      });
+      const data = await res.json();
+      if (data.suggestion) {
+        setNotes(data.suggestion);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSuggestingNotes(false);
+    }
+  };
+
+  const handleGetScheduleSuggestion = async () => {
+    try {
+      const res = await fetch("/api/ai/scheduling-suggestion", {
+        method: "POST",
+        body: JSON.stringify({ serviceId }),
+      });
+      const data = await res.json();
+      if (data.suggestedTime) {
+        setScheduleSuggestion({ time: data.suggestedTime, reason: data.reason });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleGetLocation = () => {
     setIsLocating(true);
@@ -146,7 +184,17 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="scheduledDate">When do you need them? *</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="scheduledDate">When do you need them? *</Label>
+            <button
+              type="button"
+              onClick={handleGetScheduleSuggestion}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+            >
+              <Wand2 className="h-3 w-3" />
+              Not sure when?
+            </button>
+          </div>
           <Input
             id="scheduledDate"
             name="scheduledDate"
@@ -154,6 +202,12 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
             required
             className={state.fieldErrors?.scheduledDate ? "border-red-500" : ""}
           />
+          {scheduleSuggestion && (
+            <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900 animate-fade-up">
+              <span className="block font-medium">AI Tip: {scheduleSuggestion.time}</span>
+              <span className="opacity-90">{scheduleSuggestion.reason}</span>
+            </div>
+          )}
           {state.fieldErrors?.scheduledDate && (
             <p className="text-xs text-red-500">
               {state.fieldErrors.scheduledDate}
@@ -208,10 +262,27 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="notes">Project Details (Optional)</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="notes">Project Details (Optional)</Label>
+            <button
+              type="button"
+              onClick={handleSuggestNotes}
+              disabled={isSuggestingNotes}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+            >
+              {isSuggestingNotes ? (
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+              ) : (
+                <Wand2 className="h-3 w-3" />
+              )}
+              ✨ Help me describe
+            </button>
+          </div>
           <Textarea
             id="notes"
             name="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
             placeholder="Describe what needs to be done..."
             rows={3}
             className="resize-none"

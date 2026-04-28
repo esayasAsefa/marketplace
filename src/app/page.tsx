@@ -4,6 +4,7 @@ import { FeaturedPros } from "@/components/featured-pros";
 import { Footer } from "@/components/footer";
 import { HeroSection } from "@/components/hero-section";
 import { HowItWorks } from "@/components/how-it-works";
+import { AiRecommendation } from "@/components/ai-recommendation";
 
 import { StatsSection } from "@/components/stats-section";
 import { TestimonialsSection } from "@/components/testimonials-section";
@@ -12,7 +13,7 @@ import { syncCurrentUser } from "@/lib/sync-user";
 
 export default async function Home() {
   // Sync the logged-in StackAuth user to the Neon database
-  await syncCurrentUser();
+  try { await syncCurrentUser(); } catch {}
 
   return (
     <>
@@ -20,6 +21,7 @@ export default async function Home() {
       <Navbar />
       <main className="flex-1">
         <HeroSection />
+        <AiRecommendation />
         <CategoriesSection />
         <StatsSection />
         <HowItWorks />

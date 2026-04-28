@@ -2,10 +2,11 @@
 
 import { stackServerApp } from "@/stack";
 import db from "@/db";
-import { bookings, services } from "@/db/schema";
+import { bookings, services, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { syncCurrentUser } from "@/lib/sync-user";
 import { cacheSet, CACHE_KEYS, TTL } from "@/cache";
+import { sendBookingRequestEmail } from "@/email/send";
 
 export type BookingFormState = {
   success: boolean;
@@ -41,7 +42,7 @@ export async function requestBooking(
 
   const fieldErrors: Record<string, string> = {};
 
-  if (!serviceId || isNaN(serviceId)) {
+  if (!serviceId || Number.isNaN(serviceId)) {
     return { success: false, error: "Invalid service ID." };
   }
 
@@ -53,7 +54,7 @@ export async function requestBooking(
     fieldErrors.scheduledDate = "Please select a date and time.";
   } else {
     const parsedDate = new Date(scheduledDateStr);
-    if (isNaN(parsedDate.getTime())) {
+    if (Number.isNaN(parsedDate.getTime())) {
       fieldErrors.scheduledDate = "Invalid date and time.";
     } else if (parsedDate < new Date()) {
       fieldErrors.scheduledDate = "Booking date cannot be in the past.";
@@ -105,6 +106,36 @@ export async function requestBooking(
       status: "pending",
     });
 
+    const bookingDetails = await db
+      .select({
+        proEmail: users.email,
+        proName: users.name,
+        serviceTitle: services.title,
+      })
+      .from(services)
+      .innerJoin(users, eq(services.proId, users.id))
+      .where(eq(services.id, serviceId))
+      .limit(1);
+
+    if (bookingDetails.length > 0 && bookingDetails[0].proEmail) {
+      const customerName = stackUser.displayName || stackUser.primaryEmail || "A customer";
+      try {
+        const result = await sendBookingRequestEmail(
+          bookingDetails[0].proEmail,
+          customerName,
+          bookingDetails[0].serviceTitle,
+          scheduledDate.toISOString(),
+          notes?.trim() || undefined
+        );
+
+        if (!result.success) {
+          console.warn("[Booking Email] Failed to send request email:", result.error);
+        }
+      } catch (e) {
+        console.warn("[Booking Email] Non-blocking email failure:", e);
+      }
+    }
+
     // Cache the customer's phone and location data for future bookings!
     await cacheSet(
       CACHE_KEYS.customerProfile(stackUser.id),
@@ -118,9 +149,13 @@ export async function requestBooking(
     return { success: true };
   } catch (err) {
     console.error("[Booking Action Failed]:", err);
+    const message = err instanceof Error ? err.message : String(err);
     return {
       success: false,
-      error: "An unexpected error occurred. Please try again.",
+      error:
+        process.env.NODE_ENV === "production"
+          ? "An unexpected error occurred. Please try again."
+          : `Booking failed: ${message}`,
     };
   }
 }

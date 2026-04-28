@@ -7,6 +7,7 @@ import db from "@/db";
 import { bookings, services, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cacheGet, cacheSet, CACHE_KEYS, TTL } from "@/cache";
+import { syncCurrentUser } from "@/lib/sync-user";
 
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -36,10 +37,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 export default async function CustomerDashboardPage() {
-  const stackUser = await stackServerApp.getUser();
+  let stackUser;
+  try {
+    stackUser = await stackServerApp.getUser();
+  } catch {
+    redirect("/handler/sign-in");
+  }
   if (!stackUser) {
     redirect("/handler/sign-in");
   }
+
+  try { await syncCurrentUser(); } catch {}
 
   let customerBookings: CustomerBooking[] = [];
   const cacheKey = CACHE_KEYS.customerBookings(stackUser.id);

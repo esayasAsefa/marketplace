@@ -8,6 +8,8 @@ import db from "@/db";
 import { users, profiles, services } from "@/db/schema";
 import { cacheInvalidate, CACHE_KEYS } from "@/cache";
 import redis from "@/cache";
+import { moderateContent } from "@/lib/ai-moderation";
+import { sendProSignupEmail } from "@/email/send";
 
 export type FormState = {
   success: boolean;
@@ -29,6 +31,21 @@ const SERVICE_CATEGORIES = [
   "gardener",
   "security",
 ] as const;
+
+const CATEGORY_LABELS: Record<string, string> = {
+  electrician: "Electrician",
+  plumber: "Plumber",
+  tutor: "Tutor",
+  developer: "Developer",
+  painter: "Painter",
+  carpenter: "Carpenter",
+  "it-support": "IT Support",
+  mover: "Mover",
+  barber: "Barber",
+  photographer: "Photographer",
+  gardener: "Gardener",
+  security: "Security",
+};
 
 export async function createProProfile(
   _prevState: FormState,
@@ -78,6 +95,16 @@ export async function createProProfile(
 
   if (Object.keys(fieldErrors).length > 0) {
     return { success: false, error: "Please fix the errors below.", fieldErrors };
+  }
+
+  // AI Content Moderation
+  const moderationText = `${bio} ${serviceTitle} ${serviceDescription}`;
+  const moderationResult = await moderateContent(moderationText);
+  if (!moderationResult.isSafe) {
+    return {
+      success: false,
+      error: `Content flagged: ${moderationResult.reason || "Violates community guidelines."}`,
+    };
   }
 
   try {
@@ -184,6 +211,20 @@ export async function createProProfile(
 
     revalidatePath("/");
     revalidatePath("/services");
+
+    // Send pro signup confirmation email (non-blocking)
+    if (stackUser.primaryEmail) {
+      try {
+        await sendProSignupEmail(
+          stackUser.primaryEmail,
+          stackUser.displayName || "Professional",
+          serviceTitle!.trim(),
+          CATEGORY_LABELS[categoryId!] || categoryId!
+        );
+      } catch (e) {
+        console.warn("[become-pro] Pro confirmation email failed (non-blocking):", e);
+      }
+    }
   } catch (err) {
     console.error("[become-pro] Error creating pro profile:", err);
     return {

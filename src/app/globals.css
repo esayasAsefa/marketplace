@@ -385,3 +385,19 @@ html {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.45 0.01 260);
 }
+
+/* Fix for StackAuth button stuck loading spinner (reload sign) overlay */
+div[class*="stack"] button:not(:disabled) svg.animate-spin,
+button[class*="stack"]:not(:disabled) svg.animate-spin {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+div[class*="stack"] button:disabled svg.animate-spin,
+button[class*="stack"]:disabled svg.animate-spin {
+  display: inline-block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+

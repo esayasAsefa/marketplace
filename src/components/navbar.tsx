@@ -1,17 +1,20 @@
 "use client";
+import { UserButton, useStackApp, useUser } from "@stackframe/stack";
+import { LogOut, Menu, User, X, Zap } from "lucide-react";
 import Link from "next/link";
-import { Menu, X, Zap, LogOut, User } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useUser, useStackApp } from "@stackframe/stack";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { useEffect, useRef, useState } from "react";
 import { checkUserIsPro } from "@/app/actions/user";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { UserButton } from "@stackframe/stack";
 import {
-  NavigationMenu,
-  NavigationMenuItem,
-  NavigationMenuList,
-} from "@/components/ui/navigation-menu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 const navLinks = [
   { label: "Find Pros", href: "#categories" },
   { label: "How It Works", href: "#how-it-works" },
@@ -23,16 +26,50 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [authLoaded, setAuthLoaded] = useState(false);
   const user = useUser();
   const app = useStackApp();
+  const isProChecked = useRef(false);
 
   useEffect(() => {
-    if (user) {
-      checkUserIsPro().then(setIsPro);
-    } else {
+    if (user?.id) {
+      // Only check once per user session to avoid repeated server calls
+      if (isProChecked.current) {
+        setAuthLoaded(true);
+        return;
+      }
+      isProChecked.current = true;
+      checkUserIsPro()
+        .then((result) => {
+          setIsPro(result);
+          setAuthLoaded(true);
+        })
+        .catch(() => setAuthLoaded(true));
+    } else if (!user) {
+      // user is explicitly null (not loading, just not logged in)
       setIsPro(false);
+      setAuthLoaded(true);
+      isProChecked.current = false;
     }
+    // user === undefined means still loading — keep authLoaded false
   }, [user]);
+
+  // Safety timeout — if StackAuth takes too long, show the default UI
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!authLoaded) setAuthLoaded(true);
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [authLoaded]);
+
+  const handleSignOut = async () => {
+    try {
+      await app.redirectToSignOut();
+    } catch {
+      window.location.href = "/handler/sign-in";
+    }
+    setMobileOpen(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -44,7 +81,9 @@ export function Navbar() {
     <header
       id="navbar"
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "glass shadow-lg shadow-black/5" : "bg-transparent"
+        scrolled
+          ? "bg-background/95 backdrop-blur-xl border-b border-border/70 shadow-lg shadow-black/5"
+          : "bg-background/80 backdrop-blur-md border-b border-border/40"
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -78,8 +117,23 @@ export function Navbar() {
             id="desktop-actions"
           >
             <ThemeToggle />
-            {user ? (
+            {!authLoaded ? (
+              /* Skeleton placeholders while auth state resolves */
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
+                <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+              </div>
+            ) : user ? (
               <>
+                {!isPro && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="font-medium border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400 dark:hover:bg-brand-950/50"
+                  >
+                    <Link href="/become-pro">Become Pro</Link>
+                  </Button>
+                )}
                 {!isPro && (
                   <Button
                     asChild
@@ -98,7 +152,47 @@ export function Navbar() {
                     <Link href="/dashboard/pro">Pro Dashboard</Link>
                   </Button>
                 )}
-                <UserButton />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-9 w-9 rounded-full p-0 flex items-center justify-center relative overflow-hidden bg-muted hover:bg-muted/80 border-border">
+                      {user.profileImageUrl ? (
+                        <img src={user.profileImageUrl} alt="Avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl border-border/60 bg-background/95 backdrop-blur-md shadow-xl">
+                    <DropdownMenuLabel className="font-normal p-3">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-semibold leading-none">{user.displayName || "User"}</p>
+                        <p className="text-xs leading-none text-muted-foreground">{user.primaryEmail}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-border/60" />
+                    <DropdownMenuItem asChild className="cursor-pointer p-2 focus:bg-primary/5 rounded-lg mx-1 my-1">
+                      <Link href="/handler/account-settings">
+                        <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                        Account Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-border/60" />
+                    <DropdownMenuItem
+                      className="cursor-pointer p-2 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-950/30 rounded-lg mx-1 my-1 text-red-600 dark:text-red-400"
+                      onClick={async () => {
+                        try {
+                          await user.signOut();
+                        } catch {
+                          // Bypass StackAuth API 500 error popup by clearing session locally via redirect
+                          window.location.href = "/handler/sign-in";
+                        }
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <>
@@ -145,7 +239,7 @@ export function Navbar() {
           }`}
           id="mobile-menu"
         >
-          <div className="glass border-t border-border/50 px-4 pb-6 pt-2">
+          <div className="bg-background/95 backdrop-blur-xl border border-border/60 rounded-2xl mx-2 mt-2 px-4 pb-6 pt-2 shadow-2xl shadow-black/10">
             <nav className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <a
@@ -159,7 +253,12 @@ export function Navbar() {
               ))}
             </nav>
             <div className="mt-4 flex flex-col gap-2 px-4">
-              {user ? (
+              {!authLoaded ? (
+                <div className="flex flex-col gap-2">
+                  <div className="h-8 w-full animate-pulse rounded-md bg-muted" />
+                  <div className="h-8 w-full animate-pulse rounded-md bg-muted" />
+                </div>
+              ) : user ? (
                 <>
                   <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground/80">
                     <User className="h-4 w-4" />
@@ -167,6 +266,22 @@ export function Navbar() {
                       {user.displayName || user.primaryEmail || "User"}
                     </span>
                   </div>
+                  {!isPro && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center border-brand-200 text-brand-600 dark:border-brand-800 dark:text-brand-400"
+                      id="mobile-become-pro-btn"
+                    >
+                      <Link
+                        href="/become-pro"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        Become Pro
+                      </Link>
+                    </Button>
+                  )}
                   {!isPro && (
                     <Button
                       asChild
@@ -203,9 +318,8 @@ export function Navbar() {
                     variant="outline"
                     size="sm"
                     className="w-full justify-center"
-                    onClick={() => {
-                      user.signOut();
-                      setMobileOpen(false);
+                    onClick={async () => {
+                      await handleSignOut();
                     }}
                     id="mobile-sign-out-btn"
                   >

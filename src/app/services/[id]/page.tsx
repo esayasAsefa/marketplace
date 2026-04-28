@@ -13,6 +13,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { BookingForm } from "./_components/booking-form";
+import { ReviewSummary } from "./_components/review-summary";
 
 const mockDb = [
   { id: 1, title: "Master Home Electrician", price: 6500, address: "Downtown", categoryId: "electrician", proName: "Marcus Johnson", proImage: null, proEmail: "marcus@example.com", phone: "555-0101", bio: "Over 10 years of experience in residential electrical work.", verified: true, description: "Expert electrician for all your home wiring needs. I handle panel upgrades, fixture installations, and emergency fault finding.", createdAt: new Date("2023-01-15") },
@@ -231,6 +232,9 @@ export default async function ServiceDetailsPage(props: {
                     <span className="font-bold text-lg">{mockRating}</span>
                   </div>
                 </div>
+                
+                <ReviewSummary serviceId={serviceId} />
+
                 <div className="space-y-6">
                   <div className="border-b border-border/50 pb-6 last:border-0">
                     <div className="flex items-center gap-3 mb-2">
