@@ -105,7 +105,7 @@ export async function syncCurrentUser() {
     }
 
     // Keep the page functional if the database is temporarily unreachable.
-    console.error("[sync-user] Failed to sync user to database:", error);
+    console.warn("[sync-user] Failed to sync user to database:", error);
     return null;
   }
 }

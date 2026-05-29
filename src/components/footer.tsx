@@ -1,4 +1,6 @@
-import { Phone, Zap } from "lucide-react";
+"use client";
+
+import { Zap, Phone } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const footerLinks = {
@@ -32,36 +34,51 @@ const footerLinks = {
 };
 
 export function Footer() {
-  const socialLinks = [
-    { name: "X", url: "https://x.com/esayas_93" },
-    { name: "FB", url: "https://www.facebook.com/isu.chsu" },
-    { name: "IG", url: "https://www.instagram.com/esayas_93?igsh=NmFtbnN0bzVuYjdw" },
-    { name: "LI", url: "https://www.linkedin.com/in/esayas-asefa-3295a4368/" },
-  ];
-
   return (
-    <footer className="border-t border-border/50 bg-muted/30">
+    <footer className="border-t border-border/50 bg-muted">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         {/* Top section */}
         <div className="grid gap-12 lg:grid-cols-6">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <a href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-md shadow-brand-500/25">
-                <Zap className="h-5 w-5 text-white" />
+            <a href="/" className="flex items-center gap-2 group">
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden transition-transform group-hover:scale-105 bg-gradient-to-br from-brand-500 to-brand-700 shadow-md shadow-brand-500/25">
+                <Zap className="h-5 w-5 text-white absolute" />
+                <img
+                  src="/worklync.png"
+                  alt="WorkLync"
+                  className="h-full w-full object-cover relative z-10"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
               </div>
               <span className="text-xl font-bold tracking-tight">
-                Pro<span className="gradient-text">Near</span>
+                WORK<span className="gradient-text">LYNC</span>
               </span>
             </a>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Connecting people with trusted local professionals. Your one-stop
-              platform for finding, booking, and reviewing services in your
-              area.
+              Connecting Professionals & Clients. Your one-stop platform for
+              finding, booking, and reviewing services in your area.
             </p>
+            <div className="mt-3 text-sm">
+              <a
+                href="tel:+251920906223"
+                aria-label="Call WORKLYNC"
+                className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:underline"
+              >
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                +251920906223
+              </a>
+            </div>
             {/* Social Links */}
             <div className="mt-6 flex gap-3">
-              {socialLinks.map((social) => (
+              {[
+                { name: "X", url: "https://x.com/esayas_93" },
+                { name: "FB", url: "https://facebook.com/yourprofile" },
+                { name: "IG", url: "https://www.instagram.com/esayas_93?igsh=NmFtbnN0bzVuYjdw" },
+                { name: "LI", url: "https://www.linkedin.com/in/esayas-asefa-3295a4368/" }
+              ].map((social) => (
                 <a
                   key={social.name}
                   href={social.url}
@@ -73,13 +90,6 @@ export function Footer() {
                 </a>
               ))}
             </div>
-            <a
-              href="tel:+251993435600"
-              className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <Phone className="h-4 w-4" />
-              +251 993 435 600
-            </a>
           </div>
 
           {/* Links */}
@@ -107,9 +117,16 @@ export function Footer() {
         {/* Bottom  */}
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} ProNear. All rights reserved.
+            &copy; {new Date().getFullYear()} WorkLync. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
+            <a
+              href="tel:+251920906223"
+              aria-label="Call WORKLYNC"
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              +251920906223
+            </a>
             <a
               href="/privacy"
               className="text-xs text-muted-foreground transition-colors hover:text-foreground"

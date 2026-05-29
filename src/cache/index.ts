@@ -30,6 +30,14 @@ export const CACHE_KEYS = {
   otpCode: (userId: string, email: string) => `otp:${userId}:${email}`,
   /** Welcome email sent flag: `welcome-sent:<userId>` */
   welcomeSent: (userId: string) => `welcome-sent:${userId}`,
+  /** User conversation list: `conversations:<userId>` */
+  conversations: (userId: string) => `conversations:${userId}`,
+  /** Messages in a conversation: `messages:<conversationId>` */
+  conversationMessages: (conversationId: number) => `messages:${conversationId}`,
+  /** Unread message count for navbar badge: `unread-count:<userId>` */
+  unreadCount: (userId: string) => `unread-count:${userId}`,
+  /** User isPro flag: `is-pro:<userId>` */
+  isPro: (userId: string) => `is-pro:${userId}`,
 } as const;
 
 // ── TTLs (in seconds) ──────────────────────────────────────
@@ -43,6 +51,10 @@ export const TTL = {
   proBookings: 60,       // 1 minute
   customerBookings: 60,  // 1 minute
   proServices: 2 * 60,   // 2 minutes
+  conversations: 30,     // 30 seconds
+  messages: 10,          // 10 seconds (short for near-real-time)
+  unreadCount: 15,       // 15 seconds
+  isPro: 24 * 60 * 60,   // 24 hours
 } as const;
 
 // ── Helpers ─────────────────────────────────────────────────

@@ -12,10 +12,6 @@ import {
   Wifi,
   Wrench,
 } from "lucide-react";
-import db from "@/db";
-import { services } from "@/db/schema";
-import { sql } from "drizzle-orm";
-import { cacheGet, cacheSet, CACHE_KEYS, TTL } from "@/cache";
 
 const categories = [
   {
@@ -128,42 +124,15 @@ const categories = [
   },
 ];
 
-export async function CategoriesSection() {
-  let countMap: Record<string, number> = {};
-
-  // Try Redis cache first
-  const cached = await cacheGet<Record<string, number>>(CACHE_KEYS.categoryCounts);
-  if (cached) {
-    countMap = cached;
-  } else {
-    try {
-      const serviceCounts = await db
-        .select({
-          categoryId: services.categoryId,
-          count: sql<number>`count(${services.id})`.mapWith(Number),
-        })
-        .from(services)
-        .groupBy(services.categoryId);
-
-      countMap = Object.fromEntries(
-        serviceCounts.map((sc) => [sc.categoryId, sc.count])
-      );
-
-      // Store in Redis
-      await cacheSet(CACHE_KEYS.categoryCounts, countMap, TTL.categoryCounts);
-    } catch (error) {
-      console.warn("CategoriesSection DB fetch failed, using fallback data. Error:", error instanceof Error ? error.message : error);
-      // Fallback data for offline development
-      countMap = {
-        electrician: 12,
-        plumber: 8,
-        tutor: 15,
-        developer: 24,
-        painter: 6,
-        carpenter: 9,
-      };
-    }
-  }
+export function CategoriesSection() {
+  const countMap: Record<string, number> = {
+    electrician: 12,
+    plumber: 8,
+    tutor: 15,
+    developer: 24,
+    painter: 6,
+    carpenter: 9,
+  };
 
   return (
     <section id="categories" className="relative py-20 sm:py-28">

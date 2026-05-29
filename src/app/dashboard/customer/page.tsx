@@ -13,6 +13,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MessageProButton } from "./_components/message-pro-button";
 
 type CustomerBooking = {
   id: number;
@@ -37,15 +38,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 export default async function CustomerDashboardPage() {
-  let stackUser;
-  try {
-    stackUser = await stackServerApp.getUser();
-  } catch {
-    redirect("/handler/sign-in");
-  }
-  if (!stackUser) {
-    redirect("/handler/sign-in");
-  }
+  const stackUser = (await stackServerApp.getUser())!;
 
   try { await syncCurrentUser(); } catch {}
 
@@ -207,6 +200,8 @@ export default async function CustomerDashboardPage() {
                                   {booking.notes}
                                 </p>
                               )}
+
+                              <MessageProButton bookingId={booking.id} />
                             </div>
                           );
                         })}

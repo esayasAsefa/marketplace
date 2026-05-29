@@ -18,11 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import db from "@/db";
-import { services, users, profiles } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
-import { cacheGet, cacheSet, CACHE_KEYS, TTL } from "@/cache";
 
 // Map catergories to icons and colors
 const categoryMeta: Record<string, { icon: any; color: string }> = {
@@ -41,47 +37,11 @@ const categoryMeta: Record<string, { icon: any; color: string }> = {
 };
 
 export async function FeaturedPros() {
-  let featuredServices: any[] = [];
-
-  // Try Redis cache first
-  const cached = await cacheGet<any[]>(CACHE_KEYS.featuredPros);
-  if (cached) {
-    featuredServices = cached;
-  } else {
-    try {
-      const rawFeaturedServices = await db
-        .select({
-          id: services.id,
-          title: services.title,
-          price: services.price,
-          address: services.address,
-          categoryId: services.categoryId,
-          proName: users.name,
-          proImage: users.profileImageUrl,
-          verified: profiles.isPro,
-        })
-        .from(services)
-        .leftJoin(users, eq(services.proId, users.id))
-        .leftJoin(profiles, eq(users.id, profiles.userId))
-        .orderBy(desc(services.createdAt))
-        .limit(6);
-
-      featuredServices = rawFeaturedServices.map(r => ({
-        ...r,
-        verified: !!r.verified,
-      }));
-
-      // Store in Redis
-      await cacheSet(CACHE_KEYS.featuredPros, featuredServices, TTL.featuredPros);
-    } catch (error) {
-      console.warn("FeaturedPros DB fetch failed, using fallback data. Error:", error instanceof Error ? error.message : error);
-      featuredServices = [
-        { id: 1, title: "Master Home Electrician", price: 6500, address: "Downtown", categoryId: "electrician", proName: "Marcus Johnson", proImage: null, verified: true },
-        { id: 2, title: "Licensed Plumber", price: 5500, address: "Midtown", categoryId: "plumber", proName: "Sarah Chen", proImage: null, verified: true },
-        { id: 3, title: "Mathematics Tutor", price: 4500, address: "Online", categoryId: "tutor", proName: "Amara Osei", proImage: null, verified: true },
-      ];
-    }
-  }
+  const featuredServices = [
+    { id: 1, title: "Master Home Electrician", price: 6500, address: "Downtown", categoryId: "electrician", proName: "Marcus Johnson", proImage: null, verified: true },
+    { id: 2, title: "Licensed Plumber", price: 5500, address: "Midtown", categoryId: "plumber", proName: "Sarah Chen", proImage: null, verified: true },
+    { id: 3, title: "Mathematics Tutor", price: 4500, address: "Online", categoryId: "tutor", proName: "Amara Osei", proImage: null, verified: true },
+  ];
 
   return (
     <section id="featured" className="relative py-20 sm:py-28 bg-muted/30">

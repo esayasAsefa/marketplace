@@ -6,7 +6,6 @@ import { stackServerApp } from "../stack";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 import { AiChatbot } from "@/components/ai-chatbot";
-import { syncCurrentUser } from "@/lib/sync-user";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -41,13 +40,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Sync user to DB — fire-and-forget, never crash the layout
-  try {
-    await syncCurrentUser();
-  } catch {
-    // StackAuth or DB unreachable — continue rendering the page
-  }
-
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>

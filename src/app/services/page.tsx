@@ -16,23 +16,24 @@ export default async function ServicesDirectory(props: {
   const q = searchParams.q || "";
   const cat = searchParams.category && searchParams.category !== "all" ? searchParams.category : null;
 
+  console.log("=== Search Debug ===");
+  console.log("Raw searchParams:", searchParams);
+  console.log("Parsed q:", q);
+  console.log("Parsed cat:", cat);
+
+  // Filter by category only (prioritize category over text search)
   let whereClause = undefined;
-  if (cat && q) {
-    whereClause = and(
-      eq(services.categoryId, cat),
-      or(
-        ilike(services.title, `%${q}%`),
-        ilike(services.description, `%${q}%`)
-      )
-    );
-  } else if (cat) {
+  if (cat) {
     whereClause = eq(services.categoryId, cat);
   } else if (q) {
+    // If no category, search by text
     whereClause = or(
       ilike(services.title, `%${q}%`),
       ilike(services.description, `%${q}%`)
     );
   }
+
+  console.log("whereClause:", whereClause ? "EXISTS (cat or q)" : "UNDEFINED (show all)");
 
   let results: any[] = [];
 
@@ -43,32 +44,35 @@ export default async function ServicesDirectory(props: {
     results = cached;
   } else {
     try {
-      const rawResults = await db
-        .select({
-          id: services.id,
-          title: services.title,
-          price: services.price,
-          address: services.address,
-          categoryId: services.categoryId,
-          proName: users.name,
-          proImage: users.profileImageUrl,
-          verified: profiles.isPro,
-        })
-        .from(services)
-        .leftJoin(users, eq(services.proId, users.id))
-        .leftJoin(profiles, eq(users.id, profiles.userId))
-        .where(whereClause)
-        .orderBy(desc(services.createdAt));
+      // Query services directly (simpler, no joins)
+      let query = db.select({
+        id: services.id,
+        title: services.title,
+        price: services.price,
+        address: services.address,
+        categoryId: services.categoryId,
+      }).from(services);
+
+      if (whereClause) {
+        query = query.where(whereClause);
+      }
+
+      const rawResults = await query.orderBy(desc(services.createdAt));
+
+      console.log("DB Query result:", { resultCount: rawResults.length });
 
       results = rawResults.map(r => ({
         ...r,
-        verified: !!r.verified,
+        proName: null,
+        proImage: null,
+        verified: false,
       }));
 
       // Store in Redis
       await cacheSet(cacheKey, results, TTL.servicesQuery);
     } catch (error) {
-      console.warn("ServicesDirectory DB fetch failed. Reverting to mock data for UI testing. Error:", error instanceof Error ? error.message : error);
+      console.error("ServicesDirectory DB fetch failed. Error:", error instanceof Error ? error.message : error);
+      console.error("Full error:", error);
       
       // Mock dummy data for development without DB access
       const mockDb = [

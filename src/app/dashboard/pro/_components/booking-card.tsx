@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, Clock, MapPin, Phone, Mail, CalendarDays, Loader2, MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, XCircle, Clock, MapPin, Phone, Mail, CalendarDays, Loader2, MessageSquare, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { updateBookingStatus } from "../actions";
+import { getOrCreateConversation } from "../../messages/actions";
 
 type BookingCardProps = {
   booking: {
@@ -33,6 +35,8 @@ export function BookingCard({ booking }: BookingCardProps) {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState(booking.status);
   const [error, setError] = useState<string | null>(null);
+  const [messagingLoading, setMessagingLoading] = useState(false);
+  const router = useRouter();
 
   const handleStatusUpdate = async (newStatus: "accepted" | "declined" | "completed") => {
     setIsUpdating(newStatus);
@@ -44,6 +48,18 @@ export function BookingCard({ booking }: BookingCardProps) {
       setError(result.error || "Failed to update");
     }
     setIsUpdating(null);
+  };
+
+  const handleMessage = async () => {
+    setMessagingLoading(true);
+    const result = await getOrCreateConversation(booking.id);
+    if (result.success && result.data) {
+      const { conversationId } = result.data as { conversationId: number };
+      router.push(`/dashboard/messages?conversation=${conversationId}`);
+    } else {
+      setError(result.error || "Failed to open conversation");
+      setMessagingLoading(false);
+    }
   };
 
   const config = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.pending;
@@ -152,15 +168,39 @@ export function BookingCard({ booking }: BookingCardProps) {
         </div>
       )}
       {currentStatus === "accepted" && (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400"
+            onClick={() => handleStatusUpdate("completed")}
+            disabled={!!isUpdating}
+          >
+            {isUpdating === "completed" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
+            Mark as Completed
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400"
+            onClick={handleMessage}
+            disabled={messagingLoading}
+          >
+            {messagingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="mr-1 h-4 w-4" />}
+            Message
+          </Button>
+        </div>
+      )}
+      {(currentStatus === "completed" || currentStatus === "pending") && (
         <Button
           size="sm"
-          variant="outline"
-          className="w-full border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400"
-          onClick={() => handleStatusUpdate("completed")}
-          disabled={!!isUpdating}
+          variant="ghost"
+          className="w-full text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/30 mt-2"
+          onClick={handleMessage}
+          disabled={messagingLoading}
         >
-          {isUpdating === "completed" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
-          Mark as Completed
+          {messagingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="mr-1 h-4 w-4" />}
+          Message Customer
         </Button>
       )}
     </div>

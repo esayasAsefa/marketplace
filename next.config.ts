@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   },
 
   reactCompiler: true,
+  turbopack: {
+    root: process.cwd(),
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "4mb",

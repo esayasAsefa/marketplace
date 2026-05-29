@@ -20,7 +20,7 @@ const fetchWithRetry: typeof fetch = async (input, init) => {
     try {
       const res = await fetch(input, init);
       if (!res.ok) {
-        console.error(`[fetchWithRetry attempt ${attempt}] Neon responded with status ${res.status}:`, await res.clone().text());
+        console.warn(`[fetchWithRetry attempt ${attempt}] Neon responded with status ${res.status}:`, await res.clone().text());
       }
       return res;
     } catch (err) {

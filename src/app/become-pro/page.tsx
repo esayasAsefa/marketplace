@@ -22,12 +22,13 @@ import {
   Upload,
   Wand2,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createProProfile, type FormState } from "./actions";
+import { createProProfile, getExistingProData, type FormState } from "./actions";
 
 const SERVICE_CATEGORIES = [
   { id: "electrician", label: "Electrician", icon: "⚡" },
@@ -84,6 +85,32 @@ export default function BecomeProPage() {
 
   const [imageFeedback, setImageFeedback] = useState<{ isHighQuality: boolean, feedback: string } | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Uncontrolled inputs defaults
+  const [defaultPhone, setDefaultPhone] = useState("");
+  const [defaultPrice, setDefaultPrice] = useState("");
+  const [defaultAddress, setDefaultAddress] = useState("");
+
+  useEffect(() => {
+    getExistingProData().then((data) => {
+      if (data) {
+        setIsEditing(true);
+        setBio(data.profile.bio || "");
+        setDefaultPhone(data.profile.phone || "");
+        if (data.service) {
+          setServiceTitle(data.service.title);
+          setServiceDescription(data.service.description);
+          setDefaultPrice((data.service.price / 100).toString());
+          setDefaultAddress(data.service.address || "");
+          setSelectedCategory(data.service.categoryId);
+        }
+      }
+      setIsLoading(false);
+    });
+  }, []);
 
   const handleGenerateText = async (type: "bio" | "service") => {
     if (!selectedCategory) {
@@ -198,11 +225,6 @@ export default function BecomeProPage() {
     }
   }, [state.fieldErrors]);
 
-  // Redirect to sign in if not authenticated
-  if (!user) {
-    redirect("/handler/sign-in");
-  }
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -220,6 +242,17 @@ export default function BecomeProPage() {
       reader.readAsDataURL(file);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-brand-600" />
+          <p className="text-muted-foreground animate-pulse">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -243,12 +276,13 @@ export default function BecomeProPage() {
             </div>
 
             <h1 className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">
-              Become a{" "}
+              {isEditing ? "Update your" : "Become a"}{" "}
               <span className="gradient-text">Professional</span>
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-              Set up your profile, showcase your services, and start connecting
-              with customers in your area today.
+              {isEditing 
+                ? "Keep your profile up to date to attract more customers." 
+                : "Set up your profile, showcase your services, and start connecting with customers in your area today."}
             </p>
 
             {/* Benefits */}
@@ -430,6 +464,7 @@ export default function BecomeProPage() {
                     id="phone"
                     name="phone"
                     type="tel"
+                    defaultValue={defaultPhone}
                     placeholder="+251 9XX XXX XXXX"
                     required
                   />
@@ -524,11 +559,14 @@ export default function BecomeProPage() {
                       <button
                         key={cat.id}
                         type="button"
-                        onClick={() => setSelectedCategory(cat.id)}
+                        onClick={() => {
+                          if (!isEditing) setSelectedCategory(cat.id);
+                        }}
+                        disabled={isEditing && selectedCategory !== cat.id}
                         className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 text-sm font-medium transition-all duration-200 ${
                           selectedCategory === cat.id
                             ? "border-brand-500 bg-brand-50 text-brand-700 shadow-md shadow-brand-500/10 dark:bg-brand-950/30 dark:text-brand-300"
-                            : "border-border/50 hover:border-brand-200 hover:bg-brand-50/50 dark:hover:border-brand-800"
+                            : "border-border/50 hover:border-brand-200 hover:bg-brand-50/50 dark:hover:border-brand-800 disabled:opacity-50 disabled:hover:border-border/50 disabled:hover:bg-transparent"
                         }`}
                       >
                         <span className="text-xl">{cat.icon}</span>
@@ -636,6 +674,7 @@ export default function BecomeProPage() {
                       type="number"
                       min="1"
                       step="0.01"
+                      defaultValue={defaultPrice}
                       placeholder="500"
                       required
                       className="pl-12"
@@ -665,6 +704,7 @@ export default function BecomeProPage() {
                   <Input
                     id="address"
                     name="address"
+                    defaultValue={defaultAddress}
                     placeholder="e.g. Bole, Addis Ababa"
                     required
                   />
@@ -694,12 +734,12 @@ export default function BecomeProPage() {
                     {isPending ? (
                       <>
                         <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Creating Profile...
+                        {isEditing ? "Updating Profile..." : "Creating Profile..."}
                       </>
                     ) : (
                       <>
                         <Zap className="mr-2 h-4 w-4" />
-                        Launch My Pro Profile
+                        {isEditing ? "Save Changes" : "Launch My Pro Profile"}
                       </>
                     )}
                   </Button>

@@ -47,6 +47,35 @@ const CATEGORY_LABELS: Record<string, string> = {
   security: "Security",
 };
 
+export async function getExistingProData() {
+  const stackUser = await stackServerApp.getUser();
+  if (!stackUser) return null;
+
+  try {
+    const profileRes = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, stackUser.id))
+      .limit(1);
+
+    if (profileRes.length === 0 || !profileRes[0].isPro) return null;
+
+    const serviceRes = await db
+      .select()
+      .from(services)
+      .where(eq(services.proId, stackUser.id))
+      .limit(1);
+
+    return {
+      profile: profileRes[0],
+      service: serviceRes.length > 0 ? serviceRes[0] : null,
+    };
+  } catch (err) {
+    console.error("Failed to fetch existing pro data:", err);
+    return null;
+  }
+}
+
 export async function createProProfile(
   _prevState: FormState,
   formData: FormData
@@ -182,17 +211,37 @@ export async function createProProfile(
         },
       });
 
-    // 7. Insert the service listing
+    // 7. Upsert the service listing
     const priceInCents = Math.round(Number(priceStr) * 100);
 
-    await db.insert(services).values({
-      proId: stackUser.id,
-      categoryId: categoryId!,
-      title: serviceTitle!.trim(),
-      description: serviceDescription!.trim(),
-      price: priceInCents,
-      address: address!.trim(),
-    });
+    const existingService = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.proId, stackUser.id))
+      .limit(1);
+
+    if (existingService.length > 0) {
+      // Update existing service
+      await db.update(services)
+        .set({
+          title: serviceTitle!.trim(),
+          description: serviceDescription!.trim(),
+          price: priceInCents,
+          address: address!.trim(),
+          // Note: We intentionally do NOT update categoryId to lock it in
+        })
+        .where(eq(services.id, existingService[0].id));
+    } else {
+      // Insert new service
+      await db.insert(services).values({
+        proId: stackUser.id,
+        categoryId: categoryId!,
+        title: serviceTitle!.trim(),
+        description: serviceDescription!.trim(),
+        price: priceInCents,
+        address: address!.trim(),
+      });
+    }
 
     // 8. Invalidate Redis caches so new data appears immediately
     await cacheInvalidate(
@@ -227,6 +276,15 @@ export async function createProProfile(
     }
   } catch (err) {
     console.error("[become-pro] Error creating pro profile:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    
+    if (message.includes("users_email_unique")) {
+      return {
+        success: false,
+        error: "An account with this email already exists from a previous login session. Please use a different email or clean up your database.",
+      };
+    }
+    
     return {
       success: false,
       error: "Something went wrong. Please try again.",

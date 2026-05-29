@@ -9,12 +9,8 @@ import { AiRecommendation } from "@/components/ai-recommendation";
 import { StatsSection } from "@/components/stats-section";
 import { TestimonialsSection } from "@/components/testimonials-section";
 import { Navbar } from "@/components/navbar";
-import { syncCurrentUser } from "@/lib/sync-user";
 
-export default async function Home() {
-  // Sync the logged-in StackAuth user to the Neon database
-  try { await syncCurrentUser(); } catch {}
-
+export default function Home() {
   return (
     <>
       {" "}

@@ -39,15 +39,7 @@ type ProService = {
 };
 
 export default async function ProDashboardPage() {
-  let stackUser;
-  try {
-    stackUser = await stackServerApp.getUser();
-  } catch {
-    redirect("/handler/sign-in");
-  }
-  if (!stackUser) {
-    redirect("/handler/sign-in");
-  }
+  const stackUser = (await stackServerApp.getUser())!;
 
   try { await syncCurrentUser(); } catch {}
 
@@ -93,12 +85,13 @@ export default async function ProDashboardPage() {
         })
         .from(bookings)
         .innerJoin(services, eq(bookings.serviceId, services.id))
-        .innerJoin(users, eq(bookings.customerId, users.id))
+        .leftJoin(users, eq(bookings.customerId, users.id))
         .where(eq(services.proId, stackUser.id))
         .orderBy(bookings.createdAt);
 
       proBookings = rows.map((r) => ({
         ...r,
+        customerEmail: r.customerEmail || "Unknown",
         scheduledDate: r.scheduledDate.toISOString(),
         createdAt: r.createdAt.toISOString(),
       }));

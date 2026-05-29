@@ -1,9 +1,9 @@
 "use client";
 import { UserButton, useStackApp, useUser } from "@stackframe/stack";
-import { LogOut, Menu, User, X, Zap } from "lucide-react";
+import { LogOut, Menu, MessageCircle, User, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { checkUserIsPro } from "@/app/actions/user";
+import { getNavbarState } from "@/app/actions/user";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [authLoaded, setAuthLoaded] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const user = useUser();
   const app = useStackApp();
   const isProChecked = useRef(false);
@@ -39,15 +40,17 @@ export function Navbar() {
         return;
       }
       isProChecked.current = true;
-      checkUserIsPro()
-        .then((result) => {
-          setIsPro(result);
+      getNavbarState()
+        .then(({ isPro, unreadCount }) => {
+          setIsPro(isPro);
+          setUnreadCount(unreadCount);
           setAuthLoaded(true);
         })
         .catch(() => setAuthLoaded(true));
     } else if (!user) {
       // user is explicitly null (not loading, just not logged in)
       setIsPro(false);
+      setUnreadCount(0);
       setAuthLoaded(true);
       isProChecked.current = false;
     }
@@ -88,13 +91,22 @@ export function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between sm:h-20">
-          {/* Logo */}
+          {/* Logo (uses public/worklync.png; falls back to icon) */}
           <a href="/" className="flex items-center gap-2 group" id="logo-link">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-md shadow-brand-500/25 transition-transform group-hover:scale-105">
-              <Zap className="h-5 w-5 text-white" />
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden transition-transform group-hover:scale-105 bg-gradient-to-br from-brand-500 to-brand-700 shadow-md shadow-brand-500/25">
+              <Zap className="h-5 w-5 text-white absolute" />
+              <img
+                src="/worklync.png"
+                alt="WorkLync"
+                className="h-full w-full object-cover relative z-10"
+                onError={(e) => {
+                  // hide broken image so the SVG icon fallback is visible
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
             </div>
             <span className="text-xl font-bold tracking-tight">
-              Pro<span className="gradient-text">Near</span>
+              WORK<span className="gradient-text">LYNC</span>
             </span>
           </a>
 
@@ -152,6 +164,22 @@ export function Navbar() {
                     <Link href="/dashboard/pro">Pro Dashboard</Link>
                   </Button>
                 )}
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="font-medium hover:bg-primary/5 relative"
+                  id="desktop-messages-btn"
+                >
+                  <Link href="/dashboard/messages">
+                    <MessageCircle className="mr-1.5 h-4 w-4" />
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white shadow-md animate-pulse-glow">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="h-9 w-9 rounded-full p-0 flex items-center justify-center relative overflow-hidden bg-muted hover:bg-muted/80 border-border">
@@ -314,6 +342,26 @@ export function Navbar() {
                       </Link>
                     </Button>
                   )}
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center relative"
+                    id="mobile-messages-btn"
+                  >
+                    <Link
+                      href="/dashboard/messages"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <MessageCircle className="mr-1.5 h-4 w-4" />
+                      Messages
+                      {unreadCount > 0 && (
+                        <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

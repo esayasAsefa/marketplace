@@ -2,16 +2,17 @@
 
 import { stackServerApp } from "@/stack";
 import db from "@/db";
-import { bookings, services, users } from "@/db/schema";
+import { bookings, services, users, conversations, profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { syncCurrentUser } from "@/lib/sync-user";
-import { cacheSet, CACHE_KEYS, TTL } from "@/cache";
+import { cacheSet, cacheInvalidate, CACHE_KEYS, TTL } from "@/cache";
 import { sendBookingRequestEmail } from "@/email/send";
 
 export type BookingFormState = {
   success: boolean;
   error?: string;
   fieldErrors?: Record<string, string>;
+  conversationId?: number;
 };
 
 export async function requestBooking(
@@ -30,6 +31,24 @@ export async function requestBooking(
   // Ensure the customer exists in our database before adding a booking
   // (Prevents foreign key constraint errors if they signed in without hitting the homepage)
   await syncCurrentUser();
+
+  // Check if the requesting user is a pro
+  try {
+    const profileResult = await db
+      .select({ isPro: profiles.isPro })
+      .from(profiles)
+      .where(eq(profiles.userId, stackUser.id))
+      .limit(1);
+
+    if (profileResult.length > 0 && profileResult[0].isPro) {
+      return {
+        success: false,
+        error: "Professional accounts cannot request services from other professionals. To book a service, please use a customer account.",
+      };
+    }
+  } catch (err) {
+    console.error("Error checking user profile:", err);
+  }
 
   const serviceIdStr = formData.get("serviceId") as string;
   const scheduledDateStr = formData.get("scheduledDate") as string;
@@ -95,7 +114,7 @@ export async function requestBooking(
       locationLng = locationLngStr;
     }
 
-    await db.insert(bookings).values({
+    const [booking] = await db.insert(bookings).values({
       serviceId,
       customerId: stackUser.id,
       customerPhone: phoneStr ? phoneStr.trim() : null,
@@ -104,10 +123,11 @@ export async function requestBooking(
       scheduledDate,
       notes: notes?.trim(),
       status: "pending",
-    });
+    }).returning({ id: bookings.id });
 
     const bookingDetails = await db
       .select({
+        proId: services.proId,
         proEmail: users.email,
         proName: users.name,
         serviceTitle: services.title,
@@ -117,22 +137,40 @@ export async function requestBooking(
       .where(eq(services.id, serviceId))
       .limit(1);
 
-    if (bookingDetails.length > 0 && bookingDetails[0].proEmail) {
-      const customerName = stackUser.displayName || stackUser.primaryEmail || "A customer";
-      try {
-        const result = await sendBookingRequestEmail(
-          bookingDetails[0].proEmail,
-          customerName,
-          bookingDetails[0].serviceTitle,
-          scheduledDate.toISOString(),
-          notes?.trim() || undefined
-        );
+    let newConversationId: number | undefined;
 
-        if (!result.success) {
-          console.warn("[Booking Email] Failed to send request email:", result.error);
+    if (bookingDetails.length > 0) {
+      const details = bookingDetails[0];
+
+      // Create a conversation for this booking
+      const [conversation] = await db.insert(conversations).values({
+        bookingId: booking.id,
+        customerId: stackUser.id,
+        proId: details.proId,
+      }).returning({ id: conversations.id });
+      
+      newConversationId = conversation.id;
+
+      // Invalidate the Pro's dashboard bookings cache so they see it instantly!
+      await cacheInvalidate(CACHE_KEYS.proBookings(details.proId));
+
+      if (details.proEmail) {
+        const customerName = stackUser.displayName || stackUser.primaryEmail || "A customer";
+        try {
+          const result = await sendBookingRequestEmail(
+            details.proEmail,
+            customerName,
+            details.serviceTitle,
+            scheduledDate.toISOString(),
+            notes?.trim() || undefined
+          );
+
+          if (!result.success) {
+            console.warn("[Booking Email] Failed to send request email:", result.error);
+          }
+        } catch (e) {
+          console.warn("[Booking Email] Non-blocking email failure:", e);
         }
-      } catch (e) {
-        console.warn("[Booking Email] Non-blocking email failure:", e);
       }
     }
 
@@ -146,7 +184,7 @@ export async function requestBooking(
       TTL.customerProfile
     );
 
-    return { success: true };
+    return { success: true, conversationId: newConversationId };
   } catch (err) {
     console.error("[Booking Action Failed]:", err);
     const message = err instanceof Error ? err.message : String(err);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Zap, CalendarDays, CheckCircle2, AlertCircle, MapPin, Loader2, Wand2 } from "lucide-react";
+import { Zap, CalendarDays, CheckCircle2, AlertCircle, MapPin, Loader2, Wand2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,9 +14,10 @@ type BookingFormProps = {
   hourlyRate: string;
   defaultPhone?: string;
   defaultLocation?: { lat: number; lng: number } | null;
+  isCurrentUserPro?: boolean;
 };
 
-export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocation }: BookingFormProps) {
+export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocation, isCurrentUserPro }: BookingFormProps) {
   const [state, formAction, isPending] = useActionState<
     BookingFormState,
     FormData
@@ -101,11 +102,20 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
         <p className="text-muted-foreground mb-6">
           The professional has been notified. They will review your request and get back to you shortly.
         </p>
-        <Link href="/">
-          <Button variant="outline" className="w-full">
-            Return Home
-          </Button>
-        </Link>
+        <div className="space-y-3">
+          {state.conversationId && (
+            <Link href={`/dashboard/messages?conversation=${state.conversationId}`}>
+              <Button className="w-full bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-500/20">
+                Message Professional
+              </Button>
+            </Link>
+          )}
+          <Link href="/">
+            <Button variant="outline" className="w-full">
+              Return Home
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -156,7 +166,19 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
         </div>
       )}
 
-      <form action={formAction} className="space-y-4">
+      {isCurrentUserPro ? (
+        <div className="mb-6 rounded-xl border border-brand-200 bg-brand-50 p-6 text-center shadow-sm dark:border-brand-900/50 dark:bg-brand-950/20">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-900/50">
+            <Briefcase className="h-6 w-6 text-brand-600 dark:text-brand-400" />
+          </div>
+          <h4 className="mb-2 font-bold text-brand-900 dark:text-brand-100">You are a Professional</h4>
+          <p className="text-sm text-brand-700 dark:text-brand-300">
+            Professional accounts cannot request services from other professionals. To book a service, please use a customer account.
+          </p>
+        </div>
+      ) : (
+        <>
+          <form action={formAction} className="space-y-4">
         <input type="hidden" name="serviceId" value={serviceId} />
         {location && (
           <>
@@ -305,9 +327,11 @@ export function BookingForm({ serviceId, hourlyRate, defaultPhone, defaultLocati
         </Button>
       </form>
 
-      <p className="text-xs text-center text-muted-foreground mt-4">
-        You won't be charged until the provider accepts your request.
-      </p>
+          <p className="text-xs text-center text-muted-foreground mt-4">
+            You won't be charged until the provider accepts your request.
+          </p>
+        </>
+      )}
     </div>
   );
 }

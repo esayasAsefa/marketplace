@@ -36,10 +36,21 @@ export default async function ServiceDetailsPage(props: {
 
   const stackUser = await stackServerApp.getUser();
   let defaultCustomerProfile = null;
+  let isCurrentUserPro = false;
   if (stackUser) {
     defaultCustomerProfile = await cacheGet<{ phone: string; location: { lat: number; lng: number } | null }>(
       CACHE_KEYS.customerProfile(stackUser.id)
     );
+    try {
+      const profileResult = await db
+        .select({ isPro: profiles.isPro })
+        .from(profiles)
+        .where(eq(profiles.userId, stackUser.id))
+        .limit(1);
+      isCurrentUserPro = profileResult.length > 0 && !!profileResult[0].isPro;
+    } catch {
+      isCurrentUserPro = false;
+    }
   }
 
   let service = null;
@@ -274,6 +285,7 @@ export default async function ServiceDetailsPage(props: {
                 hourlyRate={hourlyRate}
                 defaultPhone={defaultCustomerProfile?.phone}
                 defaultLocation={defaultCustomerProfile?.location}
+                isCurrentUserPro={isCurrentUserPro}
               />
             </div>
 
