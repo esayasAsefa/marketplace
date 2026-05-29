@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { stackServerApp } from "@/stack";
 import db from "@/db";
 import { users, profiles, services } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { cacheInvalidate, CACHE_KEYS } from "@/cache";
 import redis from "@/cache";
 import { moderateContent } from "@/lib/ai-moderation";
