@@ -45,17 +45,26 @@ export default async function ServicesDirectory(props: {
   } else {
     try {
       // Query services directly (simpler, no joins)
-      let query = db.select({
-        id: services.id,
-        title: services.title,
-        price: services.price,
-        address: services.address,
-        categoryId: services.categoryId,
-      }).from(services);
-
-      if (whereClause) {
-        query = query.where(whereClause);
-      }
+      const query = whereClause
+        ? db
+            .select({
+              id: services.id,
+              title: services.title,
+              price: services.price,
+              address: services.address,
+              categoryId: services.categoryId,
+            })
+            .from(services)
+            .where(whereClause)
+        : db
+            .select({
+              id: services.id,
+              title: services.title,
+              price: services.price,
+              address: services.address,
+              categoryId: services.categoryId,
+            })
+            .from(services);
 
       const rawResults = await query.orderBy(desc(services.createdAt));
 

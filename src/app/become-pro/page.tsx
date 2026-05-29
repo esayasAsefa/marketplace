@@ -70,6 +70,7 @@ const steps = [
 
 export default function BecomeProPage() {
   const user = useUser();
+  if (!user) return <div>Loading...</div>;
   const [step, setStep] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
